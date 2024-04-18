@@ -125,7 +125,7 @@ class _WebLoginPageState extends State<WebLoginPage> {
 
   Future<void> _saveLoginData(String email, String password) async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
-    await prefs.setString('email', email);
+    await prefs.setString('emaill', email);
     await prefs.setString('password', password);
   }
 
@@ -143,7 +143,7 @@ class _WebLoginPageState extends State<WebLoginPage> {
 
   Future<void> _checkLoginStatus() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
-    String? email = prefs.getString('email');
+    String? email = prefs.getString('emaill');
     String? password = prefs.getString('password');
     if (email != null && password != null) {
       // Navigate to the appropriate home page based on login type
