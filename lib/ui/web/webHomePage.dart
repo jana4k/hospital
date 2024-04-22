@@ -1,13 +1,13 @@
 import 'dart:convert';
-import 'dart:html' as html;
+
 import 'dart:io';
-import 'dart:typed_data';
+
 
 import 'package:file_picker/file_picker.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/widgets.dart';
-import 'package:myapp/ui/app/about.dart';
+
 import 'package:permission_handler/permission_handler.dart';
 import 'package:encrypt/encrypt.dart' as encrypt;
 import 'package:qr_flutter/qr_flutter.dart';
@@ -37,6 +37,7 @@ class _WebHomePageState extends State<WebHomePage> {
       TextEditingController();
   List<String> _pdfFilePaths = [];
   String? _imageFilePath;
+  // ignore: unused_field
   bool _loading = false;
   SharedPreferences? _prefs;
   bool _dataSubmitted = false;

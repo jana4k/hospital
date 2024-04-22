@@ -1,99 +1,59 @@
+import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:firebase_database/firebase_database.dart';
 
 class HospitalHomePage extends StatefulWidget {
   const HospitalHomePage({super.key});
 
   @override
-  State<HospitalHomePage> createState() => _HospitalHomePageState();
+  _HospitalHomePageState createState() => _HospitalHomePageState();
 }
 
 class _HospitalHomePageState extends State<HospitalHomePage> {
-  List<String> patientNames = [
-    'Patient 1',
-    'Patient 2',
-    'Patient 3'
-  ]; // Example list of patient names
+  @override
+  void initState() {
+    // TODO: implement initState
+    super.initState();
+    // _initFirebase();
+  }
+  Future<void> _initFirebase() async {
+    await Firebase.initializeApp();}
+  final DatabaseReference _databaseReference =
+      FirebaseDatabase.instance.reference().child('formData');
+  Future<void> _fetchFormDataFromFirebase() async {
+    final databaseRef = _databaseReference.child('formData');
+    final snapshot = await databaseRef.get();
+
+    if (snapshot.exists) {
+      final formData = snapshot.value as Map<String, dynamic>;
+      // Process the fetched data
+      if (kDebugMode) {
+        print('Name: ${formData['name']}');
+      }
+      if (kDebugMode) {
+        print('Age: ${formData['age']}');
+      }
+      // ...
+    } else {
+      if (kDebugMode) {
+        print('No data found');
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Hospital Home Page'),
-      ),
-      body: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Message Box
-            const Card(
-              elevation: 3,
-              margin: EdgeInsets.all(10),
-              child: Padding(
-                padding: EdgeInsets.all(10),
-                child: Row(
-                  children: [
-                    Icon(Icons.info, color: Colors.blue),
-                    SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        'New user added few seconds ago. Check it now.',
-                        style: TextStyle(color: Colors.blue),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            // Patient Names
-            ListView.builder(
-              shrinkWrap: true,
-              itemCount: patientNames.length,
-              itemBuilder: (context, index) {
-                return ListTile(
-                  title: Text(patientNames[index]),
-                  onTap: () {
-                    // Show patient details dialog
-                    _showPatientDetailsDialog(patientNames[index]);
-                  },
-                );
-              },
-            ),
-          ],
+        appBar: AppBar(
+          title: const Text('Hospital Home Page'),
         ),
-      ),
-    );
-  }
-
-  // Function to show patient details dialog
-  void _showPatientDetailsDialog(String patientName) {
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: Text('Patient Details - $patientName'),
-          content: const SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Add patient details here based on patientName
-                // For example:
-                Text('Age: 25'),
-                Text('Gender: Male'),
-                Text('Address: XYZ Street'),
-                // Add more patient details as needed
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
+        body: Center(
+          child: ElevatedButton(
               onPressed: () {
-                Navigator.of(context).pop();
+                // _fetchFormDataFromFirebase();
               },
-              child: const Text('Close'),
-            ),
-          ],
-        );
-      },
-    );
+              child: const Text('data')),
+        ));
   }
 }

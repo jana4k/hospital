@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/widgets.dart';
 import 'package:myapp/ui/app/about.dart';
@@ -9,6 +11,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:encrypt/encrypt.dart' as encrypt;
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_database/firebase_database.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -40,14 +43,87 @@ class _HomePageState extends State<HomePage> {
   bool _dataSubmitted = false;
   late String _encryptedData;
   bool normalData = false;
-
+  late DatabaseReference _databaseReference;
+  late FirebaseStorage _storage;
+  late Future<void> _firebaseInitialized;
+  bool _isSubmitting = false;
   @override
   void initState() {
     super.initState();
     _loadDataFromPrefs();
     _generateEncryptedData();
+    _firebaseInitialized = _initFirebase();
   }
 
+  Future<void> _initFirebase() async {
+    await Firebase.initializeApp();
+
+    _storage =
+        FirebaseStorage.instanceFor(bucket: 'gs://hospital-1c0f8.appspot.com');
+
+    _databaseReference = FirebaseDatabase.instance.reference();
+    // Set the correct database URL
+    FirebaseDatabase.instance.setPersistenceEnabled(true);
+    FirebaseDatabase.instance.setPersistenceCacheSizeBytes(10000000);
+    _databaseReference = FirebaseDatabase(
+      databaseURL:
+          'https://hospital-1c0f8-default-rtdb.asia-southeast1.firebasedatabase.app',
+    ).reference();
+  }
+
+  Future<void> _saveFormDataToFirebase() async {
+    setState(() {
+      _isSubmitting = true;
+    });
+    await _firebaseInitialized;
+    if (_formKey.currentState!.validate()) {
+      final formData = {
+        'name': _nameController.text,
+        'age': _ageController.text,
+        'gender': _genderController.text,
+        'address': _addressController.text,
+        'contact': _contactController.text,
+        'email': _emailController.text,
+        'bloodGroup': _bloodGroupController.text,
+        'height': _heightController.text,
+        'weight': _weightController.text,
+        'allergies': _allergiesController.text,
+        'medications': _medicationsController.text,
+        'medicalHistory': _medicalHistoryController.text,
+      };
+
+      final databaseRef = _databaseReference.child('formData').push();
+      await databaseRef.set(formData);
+// Upload images
+      if (_imageFilePath != null) {
+        final imageFile = File(_imageFilePath!);
+        final imageStorageRef =
+            _storage.ref().child('formData/${databaseRef.key}/image');
+        await imageStorageRef.putFile(imageFile);
+        final imageUrl = await imageStorageRef.getDownloadURL();
+        await databaseRef.update({'image': imageUrl});
+      }
+
+      // Upload PDFs
+      for (final pdfFilePath in _pdfFilePaths) {
+        final pdfFile = File(pdfFilePath);
+        final pdfStorageRef =
+            _storage.ref().child('formData/${databaseRef.key}/pdf');
+        await pdfStorageRef.putFile(pdfFile);
+        final pdfUrl = await pdfStorageRef.getDownloadURL();
+        await databaseRef.child('pdf').push().set({'url': pdfUrl});
+      }
+      setState(() {
+        _isSubmitting = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Be safe! We alerted your nearby hospital'),
+        ),
+      );
+    }
+  }
+ 
   Future<void> _loadDataFromPrefs() async {
     _prefs = await SharedPreferences.getInstance();
     setState(() {
@@ -163,24 +239,8 @@ class _HomePageState extends State<HomePage> {
                   ),
                   ListTile(
                     title: const Text('Contact'),
-                    onTap: () {
-                      showDialog(
-                        context: context,
-                        builder: (BuildContext context) {
-                          return AlertDialog(
-                            title: const Text("Message"),
-                            content: const Text("Updated successfully"),
-                            actions: <Widget>[
-                              TextButton(
-                                child: const Text("OK"),
-                                onPressed: () {
-                                  Navigator.of(context).pop();
-                                },
-                              ),
-                            ],
-                          );
-                        },
-                      );
+                    onTap: () async {
+                      await _saveFormDataToFirebase();
                     },
                   ),
                 ],
@@ -201,7 +261,7 @@ class _HomePageState extends State<HomePage> {
       body: SingleChildScrollView(
         child: Padding(
           padding: const EdgeInsets.all(20.0),
-          child: !_dataSubmitted
+          child: _dataSubmitted
               ? Form(
                   key: _formKey,
                   child: Column(
@@ -285,58 +345,64 @@ class _HomePageState extends State<HomePage> {
                       const SizedBox(height: 20.0),
                       Center(
                         child: ElevatedButton(
-                          onPressed: () async {
-                            if (_formKey.currentState!.validate()) {
-                              if (_pdfFilePaths.isNotEmpty &&
-                                  _pdfFilePaths.any((path) =>
-                                      File(path).lengthSync() >
-                                      5 * 1024 * 1024)) {
-                                showDialog(
-                                  context: context,
-                                  builder: (context) {
-                                    return AlertDialog(
-                                      title: const Text('File Size Error'),
-                                      content: const Text(
-                                          'PDF file size should be less than 5MB.'),
-                                      actions: [
-                                        TextButton(
-                                          onPressed: () {
-                                            Navigator.pop(context);
-                                          },
-                                          child: const Text('OK'),
-                                        ),
-                                      ],
-                                    );
-                                  },
-                                );
-                                return;
-                              }
-
-                              setState(() {
-                                _dataSubmitted = true;
-                              });
-                              await _saveDataToPrefs();
-                              showDialog(
-                                context: context,
-                                builder: (context) {
-                                  return AlertDialog(
-                                    title: const Text('Submitted'),
-                                    content: const Text(
-                                        'Your data has been submitted successfully'),
-                                    actions: [
-                                      TextButton(
-                                        onPressed: () {
-                                          Navigator.pop(context);
+                          onPressed: _isSubmitting
+                              ? null
+                              : () async {
+                                  if (_formKey.currentState!.validate()) {
+                                    if (_pdfFilePaths.isNotEmpty &&
+                                        _pdfFilePaths.any((path) =>
+                                            File(path).lengthSync() >
+                                            5 * 1024 * 1024)) {
+                                      showDialog(
+                                        context: context,
+                                        builder: (context) {
+                                          return AlertDialog(
+                                            title:
+                                                const Text('File Size Error'),
+                                            content: const Text(
+                                                'PDF file size should be less than 5MB.'),
+                                            actions: [
+                                              TextButton(
+                                                onPressed: () {
+                                                  Navigator.pop(context);
+                                                },
+                                                child: const Text('OK'),
+                                              ),
+                                            ],
+                                          );
                                         },
-                                        child: const Text('OK'),
-                                      ),
-                                    ],
-                                  );
+                                      );
+                                      return;
+                                    }
+                                    await _saveDataToPrefs();
+
+                                    setState(() {
+                                      _dataSubmitted = true;
+                                    });
+
+                                    showDialog(
+                                      context: context,
+                                      builder: (context) {
+                                        return AlertDialog(
+                                          title: const Text('Submitted'),
+                                          content: const Text(
+                                              'Your data has been submitted successfully'),
+                                          actions: [
+                                            TextButton(
+                                              onPressed: () {
+                                                Navigator.pop(context);
+                                              },
+                                              child: const Text('OK'),
+                                            ),
+                                          ],
+                                        );
+                                      },
+                                    );
+                                  }
                                 },
-                              );
-                            }
-                          },
-                          child: const Text('Submit'),
+                          child: _isSubmitting
+                              ? const CircularProgressIndicator()
+                              : const Text('Submit'),
                         ),
                       ),
                     ],
