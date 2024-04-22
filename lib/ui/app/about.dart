@@ -1,7 +1,7 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:sensors_plus/sensors_plus.dart';
-
 
 class AboutPage extends StatefulWidget {
   const AboutPage({super.key});
@@ -27,6 +27,19 @@ class _AboutPageState extends State<AboutPage> {
         _y = event.y;
         _z = event.z;
       });
+
+      // Detect shake
+      if (_isShake(event)) {
+        if (kDebugMode) {
+          print('shake!');
+        // Perform action on shake
+        
+        }ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Shake!'),
+          ),
+        );
+      }
     });
   }
 
@@ -34,6 +47,14 @@ class _AboutPageState extends State<AboutPage> {
   void dispose() {
     super.dispose();
     _accelerometerSubscription.cancel();
+  }
+
+  bool _isShake(UserAccelerometerEvent event) {
+    // Adjust the threshold values according to your requirements
+    const double threshold = 15.0;
+    return event.x.abs() > threshold ||
+        event.y.abs() > threshold ||
+        event.z.abs() > threshold;
   }
 
   @override
@@ -47,20 +68,29 @@ class _AboutPageState extends State<AboutPage> {
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.center,
           children: <Widget>[
-            Text('X: $_x',style: const TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.normal,
-          ),),
-            const SizedBox(height: 15,),
-            Text('Y: $_y',style: const TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.normal,
-          ),), 
-            const SizedBox(height: 15,),
-            Text('Z: $_z',style: const TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.normal,
-          ),),
+            Text(
+              'X: $_x',
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.normal,
+              ),
+            ),
+            const SizedBox(height: 15),
+            Text(
+              'Y: $_y',
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.normal,
+              ),
+            ),
+            const SizedBox(height: 15),
+            Text(
+              'Z: $_z',
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.normal,
+              ),
+            ),
           ],
         ),
       ),
