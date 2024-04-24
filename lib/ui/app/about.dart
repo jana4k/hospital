@@ -28,18 +28,6 @@ class _AboutPageState extends State<AboutPage> {
         _z = event.z;
       });
 
-      // Detect shake
-      if (_isShake(event)) {
-        if (kDebugMode) {
-          print('shake!');
-        // Perform action on shake
-        
-        }ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Shake!'),
-          ),
-        );
-      }
     });
   }
 
@@ -49,13 +37,7 @@ class _AboutPageState extends State<AboutPage> {
     _accelerometerSubscription.cancel();
   }
 
-  bool _isShake(UserAccelerometerEvent event) {
-    // Adjust the threshold values according to your requirements
-    const double threshold = 15.0;
-    return event.x.abs() > threshold ||
-        event.y.abs() > threshold ||
-        event.z.abs() > threshold;
-  }
+ 
 
   @override
   Widget build(BuildContext context) {

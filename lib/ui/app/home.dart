@@ -1,10 +1,13 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:sensors_plus/sensors_plus.dart';
 import 'package:flutter/widgets.dart';
 import 'package:myapp/ui/app/about.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -47,12 +50,81 @@ class _HomePageState extends State<HomePage> {
   late FirebaseStorage _storage;
   late Future<void> _firebaseInitialized;
   bool _isSubmitting = false;
+  late StreamSubscription<UserAccelerometerEvent> _accelerometerSubscription;
+  bool _isDialogShowing = false; // Variable to track if a dialog is already showing
+
   @override
   void initState() {
     super.initState();
+
     _loadDataFromPrefs();
     _generateEncryptedData();
     _firebaseInitialized = _initFirebase();
+
+    _accelerometerSubscription =
+        userAccelerometerEvents.listen((UserAccelerometerEvent event) {
+      // Detect shake
+      if (_isShake(event) && !_isDialogShowing) {
+        // Check if a dialog is not already showing
+        setState(() {
+          _isDialogShowing = true; // Set to true to prevent multiple dialogs
+        });
+        _saveFormDataToFirebase();
+        showDialog(
+          context: context,
+          barrierDismissible: false, // Prevent dialog dismissal on tap outside
+          builder: (context) {
+            return AlertDialog(
+              title: const Text(
+                'Alert',
+                style: TextStyle(color: Color.fromARGB(255, 235, 82, 36)),
+              ),
+              content: const Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                      'Accident Detected Your Data Has Been sended to your nearby hospital'),
+                  SizedBox(
+                    height: 15,
+                  ),
+                  Center(
+                      child: Text(
+                    'Be safe for a while',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                  )),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    setState(() {
+                      _isDialogShowing = false; // Reset the dialog showing flag
+                    });
+                  },
+                  child: const Text('OK'),
+                ),
+              ],
+            );
+          },
+        );
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    super.dispose();
+    _accelerometerSubscription.cancel();
+  }
+
+  bool _isShake(UserAccelerometerEvent event) {
+    // Adjust the threshold values according to your requirements
+    const double threshold = 20.0;
+    return event.x.abs() > threshold ||
+        event.y.abs() > threshold ||
+        event.z.abs() > threshold;
   }
 
   Future<void> _initFirebase() async {
@@ -123,7 +195,7 @@ class _HomePageState extends State<HomePage> {
       );
     }
   }
- 
+
   Future<void> _loadDataFromPrefs() async {
     _prefs = await SharedPreferences.getInstance();
     setState(() {
@@ -240,7 +312,7 @@ class _HomePageState extends State<HomePage> {
                   ListTile(
                     title: const Text('Contact'),
                     onTap: () async {
-                      await _saveFormDataToFirebase();
+                      // await _saveFormDataToFirebase();
                     },
                   ),
                 ],
@@ -261,7 +333,7 @@ class _HomePageState extends State<HomePage> {
       body: SingleChildScrollView(
         child: Padding(
           padding: const EdgeInsets.all(20.0),
-          child: _dataSubmitted
+          child: !_dataSubmitted
               ? Form(
                   key: _formKey,
                   child: Column(
