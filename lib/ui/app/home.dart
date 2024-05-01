@@ -7,6 +7,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:sensors_plus/sensors_plus.dart';
 import 'package:flutter/widgets.dart';
 import 'package:myapp/ui/app/about.dart';
@@ -51,12 +52,14 @@ class _HomePageState extends State<HomePage> {
   late Future<void> _firebaseInitialized;
   bool _isSubmitting = false;
   late StreamSubscription<UserAccelerometerEvent> _accelerometerSubscription;
-  bool _isDialogShowing = false; // Variable to track if a dialog is already showing
-
+  bool _isDialogShowing =
+      false; // Variable to track if a dialog is already showing
+  double? _latitude;
+  double? _longitude;
   @override
   void initState() {
     super.initState();
-
+    _getCurrentLocation();
     _loadDataFromPrefs();
     _generateEncryptedData();
     _firebaseInitialized = _initFirebase();
@@ -119,6 +122,43 @@ class _HomePageState extends State<HomePage> {
     _accelerometerSubscription.cancel();
   }
 
+  Future<void> _getCurrentLocation() async {
+    var status = await Permission.location.status;
+    if (status.isGranted) {
+      try {
+        Position position = await Geolocator.getCurrentPosition(
+            desiredAccuracy: LocationAccuracy.high);
+        setState(() {
+          _latitude = position.latitude;
+          _longitude = position.longitude;
+        });
+      } catch (e) {
+        print("Error: $e");
+      }
+    } else {
+      status = await Permission.location.request();
+      if (!status.isGranted) {
+        showDialog(
+          context: context,
+          builder: (BuildContext context) {
+            return AlertDialog(
+              title: const Text("Permission Denied"),
+              content: const Text("Location permission is required!"),
+              actions: <Widget>[
+                TextButton(
+                  child: const Text("OK"),
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                  },
+                ),
+              ],
+            );
+          },
+        );
+      }
+    }
+  }
+
   bool _isShake(UserAccelerometerEvent event) {
     // Adjust the threshold values according to your requirements
     const double threshold = 20.0;
@@ -149,6 +189,9 @@ class _HomePageState extends State<HomePage> {
     });
     await _firebaseInitialized;
     if (_formKey.currentState!.validate()) {
+      final googleMapsUrl =
+          'https://www.google.com/maps/search/?api=1&query=$_latitude,$_longitude';
+
       final formData = {
         'name': _nameController.text,
         'age': _ageController.text,
@@ -162,26 +205,33 @@ class _HomePageState extends State<HomePage> {
         'allergies': _allergiesController.text,
         'medications': _medicationsController.text,
         'medicalHistory': _medicalHistoryController.text,
+        'location': googleMapsUrl
       };
 
       final databaseRef = _databaseReference.child('formData').push();
       await databaseRef.set(formData);
-// Upload images
+
+      // Upload images
       if (_imageFilePath != null) {
-        final imageFile = File(_imageFilePath!);
-        final imageStorageRef =
-            _storage.ref().child('formData/${databaseRef.key}/image');
-        await imageStorageRef.putFile(imageFile);
+        final imageBytes = await File(_imageFilePath!).readAsBytes();
+        final imageExtension =
+            _imageFilePath!.split('.').last; // Get the file extension
+        final imageStorageRef = _storage
+            .ref()
+            .child('formData/${databaseRef.key}/image.$imageExtension');
+        SettableMetadata metadata =
+            SettableMetadata(contentType: 'image/$imageExtension');
+        await imageStorageRef.putData(imageBytes, metadata);
         final imageUrl = await imageStorageRef.getDownloadURL();
         await databaseRef.update({'image': imageUrl});
       }
 
       // Upload PDFs
       for (final pdfFilePath in _pdfFilePaths) {
-        final pdfFile = File(pdfFilePath);
+        final pdfBytes = await File(pdfFilePath).readAsBytes();
         final pdfStorageRef =
-            _storage.ref().child('formData/${databaseRef.key}/pdf');
-        await pdfStorageRef.putFile(pdfFile);
+            _storage.ref().child('formData/${databaseRef.key}/pdf.pdf');
+        await pdfStorageRef.putData(pdfBytes);
         final pdfUrl = await pdfStorageRef.getDownloadURL();
         await databaseRef.child('pdf').push().set({'url': pdfUrl});
       }
@@ -285,9 +335,14 @@ class _HomePageState extends State<HomePage> {
         fileToDisplay = File(_imageFilePath!);
       });
     }
+
     setState(() {
       _loading = false;
     });
+  }
+
+  String _getFileExtension(String path) {
+    return path.split('.').last;
   }
 
   @override
@@ -302,19 +357,19 @@ class _HomePageState extends State<HomePage> {
             Expanded(
               child: ListView(
                 padding: EdgeInsets.zero,
-                children: <Widget>[
-                  const DrawerHeader(
+                children: const <Widget>[
+                  DrawerHeader(
                     decoration: BoxDecoration(
                       color: Colors.blue,
                     ),
                     child: Text('Menu'),
                   ),
-                  ListTile(
-                    title: const Text('Contact'),
-                    onTap: () async {
-                      // await _saveFormDataToFirebase();
-                    },
-                  ),
+                  // ListTile(
+                  //   title: const Text('Contact'),
+                  //   onTap: () async {
+                  //     // await _saveFormDataToFirebase();
+                  //   },
+                  // ),
                 ],
               ),
             ),
@@ -424,7 +479,7 @@ class _HomePageState extends State<HomePage> {
                                     if (_pdfFilePaths.isNotEmpty &&
                                         _pdfFilePaths.any((path) =>
                                             File(path).lengthSync() >
-                                            5 * 1024 * 1024)) {
+                                            0.5 * 1024 * 1024 * 1024)) {
                                       showDialog(
                                         context: context,
                                         builder: (context) {
@@ -432,7 +487,7 @@ class _HomePageState extends State<HomePage> {
                                             title:
                                                 const Text('File Size Error'),
                                             content: const Text(
-                                                'PDF file size should be less than 5MB.'),
+                                                'PDF file size should be less than 500MB.'),
                                             actions: [
                                               TextButton(
                                                 onPressed: () {
@@ -447,7 +502,7 @@ class _HomePageState extends State<HomePage> {
                                       return;
                                     }
                                     await _saveDataToPrefs();
-
+                                    // _saveFormDataToFirebase();
                                     setState(() {
                                       _dataSubmitted = true;
                                     });

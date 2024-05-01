@@ -29,7 +29,7 @@ class _LoginPageState extends State<LoginPage> {
             TextField(
               controller: _usernameController,
               decoration: const InputDecoration(
-                labelText: 'Username or Phone Number',
+                labelText: 'Email or Phone Number',
               ),
             ),
             const SizedBox(height: 20.0),

@@ -1,5 +1,7 @@
 import 'dart:async';
 
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_database/firebase_database.dart';
@@ -149,37 +151,54 @@ class _HospitalHomePageState extends State<HospitalHomePage> {
         return AlertDialog(
           title: Text('Details for ${formData['name']}'),
           content: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildDetail('Address', formData['address']),
-                _buildDetail('Age', formData['age']),
-                _buildDetail('Allergies', formData['allergies']),
-                _buildDetail('Blood Group', formData['bloodGroup']),
-                _buildDetail('Contact', formData['contact']),
-                _buildDetail('Email', formData['email']),
-                _buildDetail('Gender', formData['gender']),
-                _buildDetail('Height', formData['height']),
-                _buildDetail('Medical History', formData['medicalHistory']),
-                _buildDetail('Medications', formData['medications']),
-                _buildDetail('Weight', formData['weight']),
-                // Location with copy option
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              _buildDetail('Address', formData['address']),
+              _buildDetail('Age', formData['age']),
+              _buildDetail('Allergies', formData['allergies']),
+              _buildDetail('Blood Group', formData['bloodGroup']),
+              _buildDetail('Contact', formData['contact']),
+              _buildDetail('Email', formData['email']),
+              _buildDetail('Gender', formData['gender']),
+              _buildDetail('Height', formData['height']),
+              _buildDetail('Medical History', formData['medicalHistory']),
+              _buildDetail('Medications', formData['medications']),
+              _buildDetail('Weight', formData['weight']),
+              _buildLocationDetail('image', formData['image']),
+              // Location with copy option
 
+              _buildLocationDetail('Location', formData['location']),
+
+              // if (formData['image'] is String) ...[
+              //   Image.network(
+              //     formData['image'],
+              //     loadingBuilder: (context, widget, event) {
+              //       if (event == null) {
+              //         return widget;
+              //       } else {
+              //         // Display loading indicator while image is loading
+              //         return const Center(
+              //           child: CircularProgressIndicator(),
+              //         );
+              //       }
+              //     },
+              //   ),
+              // ] else if (formData['image'] is ProgressEvent) ...[
+              //   // Handle progress event
+              //   const Center(
+              //     child: CircularProgressIndicator(),
+              //   ),
+              // ] else ...[
+              //   // Handle other cases, such as image not available
+              //   const Text('Image not available'),
+              // ],
+              // Text('Image URL: ${formData['image']}'),
+              // // Show PDF if available
+              if (formData['pdf'] != null) ...[
                 _buildLocationDetail(
-                    'Location', "https://goo.gl/maps/TxNMxrXNFrp9oWbc8"),
-
-                // Show image if available
-                if (formData['image'] != null &&
-                    formData['image'] is String) ...[
-                  _buildLocationDetail('Image', formData['image']),
-                ],
-                // Show PDF if available
-                if (formData['pdf'] != null && formData['pdf'] is Map) ...[
-                  _buildLocationDetail(
-                      'PDF', formData['pdf'].values.first['url']),
-                ],
+                    'PDF', formData['pdf']),
               ],
-            ),
+            ]),
           ),
           actions: <Widget>[
             TextButton(
@@ -230,6 +249,21 @@ class _HospitalHomePageState extends State<HospitalHomePage> {
         ),
         const Divider(),
       ],
+    );
+  }
+
+  Widget _buildImage(String imageUrl) {
+    return Image.network(
+      imageUrl,
+      loadingBuilder: (context, widget, event) {
+        if (event == null) {
+          return widget;
+        } else {
+          return const Center(
+            child: CircularProgressIndicator(),
+          );
+        }
+      },
     );
   }
 
